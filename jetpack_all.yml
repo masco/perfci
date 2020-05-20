@@ -63,7 +63,7 @@ scale:
 # 'interfaces' parameter.
 interfaces: [enp1s0f0]
 
-extra_templates:
+# extra_templates:
 
 # containers params
 registry_mirror: registry-proxy.engineering.redhat.com
