@@ -15,16 +15,20 @@ node('perfci') {
     checkout scm
 
     stage('setup jetpack') {
+        echo 'clone vars'
+        sh 'git clone https://github.com/masco/perfci-vars.git'
         echo 'setup jetpack'
         sh 'rm -rf jetpack'
         sh 'git clone https://github.com/redhat-performance/jetpack.git'
-        sh 'cp instackenv.json jetpack/.'
-        sh 'echo "neutron_backend: ovn" >> jetpack_all.yml'
-        sh 'cp jetpack_all.yml jetpack/group_vars/all.yml'
+        sh 'cp jobs/DFG/perfscale/perfci/data/instackenv.json jetpack/.'
+        sh 'echo "neutron_backend: ovs" >> perfci-vars/jetpack_all.yml'
+        sh 'echo "osp_release: 16" >> perfci-vars/jetpack_all.yml'
+        sh """echo "vm_image_url: 'http://download.hosts.prod.upshift.rdu2.redhat.com/released/RHEL-8/8.1.0/BaseOS/x86_64/images/rhel-guest-image-8.1-263.x86_64.qcow2'" >> perfci-vars/jetpack_all.yml"""
+        sh 'cp perfci-vars/jetpack_all.yml jetpack/group_vars/all.yml'
     }
 
     stage('deploy osp using jetpack') {
-	echo 'deploy osp13 with OVN'
+	echo 'deploy osp16 with OVS'
 	sh 'cd jetpack && ansible-playbook -vvv main.yml'
     }
 
@@ -34,22 +38,22 @@ node('perfci') {
         sh 'echo "graphite_host: ${graphite_host}" >> browbeat_vars.yml'
         sh 'echo "grafana_host: ${grafana_host}" >> browbeat_vars.yml'
         sh 'echo "dns_server: ${dns_server}" >> browbeat_vars.yml'
-        sh 'echo "collectd_container: false" >> browbeat_vars.yml'
-        sh 'ansible-playbook -vvv browbeat_install.yml'
+        sh 'mv browbeat_vars.yml infra/scripts/DFG/perfscale/perfci/scripts/.'
+        sh 'ansible-playbook -vvv infra/scripts/DFG/perfscale/perfci/scripts/browbeat_install.yml'
 
-        sh 'chmod +x create-vars.sh'
-        sh './create-vars.sh'
+        sh 'chmod +x infra/scripts/DFG/perfscale/perfci/scripts/create-vars.sh'
+        sh './infra/scripts/DFG/perfscale/perfci/scripts/create-vars.sh'
     }
 
     def dfgs = params.dfg_list.split(',')
     for (int i = 0; i < dfgs.length; i++) {
         String dfg = dfgs[i].trim()
         stage("Run ${dfg} tests") {
-           sh """cp ${dfg}-config-vars.yml browbeat-workload-vars.yml"""
-           sh """ansible-playbook prepare-config.yml"""
-           sh """sed -i "s/cloud_name: openstack/cloud_name: perfci-osp13-ovn-${dfg}/" browbeat-config.yaml"""
-           sh """echo "graphite_prefix: perfci-osp13-ovn-${dfg}" >> browbeat_vars.yml"""
-           sh 'ansible-playbook -vvv run_browbeat_tests.yml'
+           sh """cp perfci-vars/${dfg}-config-vars.yml infra/scripts/DFG/perfscale/perfci/scripts/browbeat-workload-vars.yml"""
+           sh """ansible-playbook infra/scripts/DFG/perfscale/perfci/scripts/prepare-config.yml"""
+           sh """sed -i "s/cloud_name: openstack/cloud_name: perfci-osp16-ovs-${dfg}/" infra/scripts/DFG/perfscale/perfci/scripts/browbeat-config.yaml"""
+           sh """echo "graphite_prefix: perfci-osp16-ovs-${dfg}" >> infra/scripts/DFG/perfscale/perfci/scripts/browbeat_vars.yml"""
+           sh 'ansible-playbook -vvv infra/scripts/DFG/perfscale/perfci/scripts/run_browbeat_tests.yml'
         }
     }
 }
